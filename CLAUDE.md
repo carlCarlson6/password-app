@@ -51,9 +51,12 @@ Docs describing the system wrongly are worse than no docs. Never leave this for 
 
 ## Commands
 
+- Local CI (from repo root): `./scripts/ci.sh` runs the full pipeline below;
+  `./scripts/ci.sh backend|frontend` runs one side only.
 - Backend (from `backend/`): `cargo test`, `cargo clippy --workspace -- -D warnings`,
   `cargo fmt --all`, `cargo run -p api`
 - Frontend (from `frontend/`): `npm run dev`, `npm run typecheck`, `npm test -- --run`,
   `npm run build`
 
-Both must pass fmt/clippy/typecheck/tests before a change is considered done.
+Both must pass fmt/clippy/typecheck/tests before a change is considered done —
+`./scripts/ci.sh` checks all of it in one go.

@@ -224,6 +224,9 @@ learns the organization structure either.
 ## 5. Development
 
 ```sh
+# full local CI — fmt/clippy/build/tests (backend) + typecheck/tests/build (frontend)
+./scripts/ci.sh                           # or: ./scripts/ci.sh backend|frontend
+
 # backend (from backend/)
 cargo test                                # tests live in each crate's tests/, mirroring src/
 cargo clippy --workspace -- -D warnings
