@@ -1,0 +1,56 @@
+# Local dev stack — start it with ./scripts/dev.sh (see that script for usage).
+#
+# Services:
+#   backend    Axum API, rebuilt & restarted on source changes (cargo-watch)
+#   frontend   Vite dev server with HMR, /api proxied to the backend service
+#
+# There is intentionally no database service: the database is SQLite (see the
+# README decisions record). The file lives on the host at backend/data/app.db
+# and reaches the backend through the ./backend bind mount, so dockerised and
+# native (`cargo run -p api`) dev share the same data. Future infrastructure
+# dependencies (e.g. Litestream in Phase 4) are added here as extra services.
+
+name: password-app
+
+services:
+  backend:
+    build:
+      context: backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    environment:
+      # 0.0.0.0 so the mapped port is reachable from outside the container
+      # (the native default 127.0.0.1 would only accept in-container clients).
+      BIND_ADDR: 0.0.0.0:8080
+      DATABASE_URL: sqlite://data/app.db
+    volumes:
+      # Source is bind-mounted so cargo-watch sees edits without image rebuilds…
+      - ./backend:/app
+      # …but target/ and the cargo registry live in named volumes: they hold
+      # Linux build artifacts that must not clobber the host's macOS target/.
+      - backend-target:/app/target
+      - cargo-registry:/usr/local/cargo/registry
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      # Point the Vite /api proxy at the backend container instead of the
+      # native-dev default (see frontend/vite.config.ts).
+      API_PROXY_TARGET: http://backend:8080
+    volumes:
+      - ./frontend:/app
+      # node_modules stays container-side: the host copy holds macOS-native
+      # binaries and must not leak in through the bind mount.
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  backend-target:
+  cargo-registry:
+  frontend-node-modules:

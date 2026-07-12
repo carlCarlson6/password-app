@@ -1,0 +1,5 @@
+# Keep the dev image build context tiny — Dockerfile.dev copies no sources
+# (they arrive via bind mount), so nothing heavy should be sent to the daemon.
+node_modules/
+dist/
+coverage/

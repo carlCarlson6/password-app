@@ -51,6 +51,9 @@ Docs describing the system wrongly are worse than no docs. Never leave this for 
 
 ## Commands
 
+- Dev stack (from repo root): `./scripts/dev.sh` starts backend + frontend (+ any
+  future infra) via Docker Compose with hot reload; `detach|logs|down` subcommands.
+  SQLite is a bind-mounted file (`backend/data/app.db`), not a compose service.
 - Local CI (from repo root): `./scripts/ci.sh` runs the full pipeline below;
   `./scripts/ci.sh backend|frontend` runs one side only.
 - Backend (from `backend/`): `cargo test`, `cargo clippy --workspace -- -D warnings`,

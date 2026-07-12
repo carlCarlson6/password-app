@@ -1,0 +1,11 @@
+# Dev-only image (used by docker-compose.yml): Node for the Vite dev server.
+# Source is NOT copied in — it arrives via bind mount for HMR. node_modules
+# lives in a named volume, so dependencies install on first container start
+# (cheap no-op afterwards), not at image build time.
+FROM node:26-slim
+
+WORKDIR /app
+EXPOSE 5173
+
+# --host: listen beyond localhost so the mapped port is reachable from the host.
+CMD ["sh", "-c", "npm install && exec npm run dev -- --host 0.0.0.0"]

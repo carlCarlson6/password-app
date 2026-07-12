@@ -1,0 +1,19 @@
+# Dev-only image (used by docker-compose.yml): Rust toolchain + cargo-watch.
+# Source code is NOT copied in — it arrives via bind mount, so edits on the
+# host rebuild and restart the API inside the container.
+FROM rust:1.96-slim
+
+# Compiled once when the image is built, then cached in the layer.
+RUN cargo install cargo-watch --locked
+
+WORKDIR /app
+EXPOSE 8080
+
+# Watch only sources and manifests: the SQLite file under data/ and the build
+# output under target/ must never trigger a restart (the repo-root .gitignore
+# that would normally exclude them is outside the mount, so be explicit).
+CMD ["cargo", "watch", \
+     "--watch", "crates", \
+     "--watch", "Cargo.toml", \
+     "--watch", "Cargo.lock", \
+     "--exec", "run -p api"]

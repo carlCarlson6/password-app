@@ -3,8 +3,9 @@
 A zero-knowledge, multi-user password manager. Rust backend, React frontend,
 clean DDD + hexagonal architecture on both sides.
 
-**Status:** Phase 0 in progress — the walking skeleton runs end to end
-(UI → Axum → use case → SQLite); Docker Compose + CI still pending.
+**Status:** Phase 0 complete — the walking skeleton runs end to end
+(UI → Axum → use case → SQLite), the full stack runs under Docker Compose
+(`./scripts/dev.sh`), and `./scripts/ci.sh` runs the CI checks locally.
 
 ---
 
@@ -180,7 +181,7 @@ learns the organization structure either.
 - [x] Cargo workspace with the four crates; empty ports wired end to end
 - [x] Vite + React + TS app with the four-layer folder structure
 - [x] SQLx + SQLite migrations setup; config loading; error taxonomy
-- [ ] Docker Compose for local dev; CI: `cargo test/clippy/fmt`, `tsc`, `vitest`
+- [x] Docker Compose for local dev; CI: `cargo test/clippy/fmt`, `tsc`, `vitest`
 - **Done when:** one dummy request travels UI → Axum → use case → SQLite and back.
   ✅ verified: `GET /api/health` through the Vite proxy returns
   `{"status":"ok","database":"up"}` from a live SQLite pool.
@@ -224,6 +225,11 @@ learns the organization structure either.
 ## 5. Development
 
 ```sh
+# one-command dev stack — backend (hot reload) + frontend (HMR) in Docker;
+# the database is SQLite, a bind-mounted file (backend/data/app.db), not a service
+./scripts/dev.sh                          # foreground; Ctrl-C stops everything
+./scripts/dev.sh detach                   # background; `logs` to follow, `down` to stop
+
 # full local CI — fmt/clippy/build/tests (backend) + typecheck/tests/build (frontend)
 ./scripts/ci.sh                           # or: ./scripts/ci.sh backend|frontend
 
@@ -244,3 +250,11 @@ npm run build
 Backend configuration comes from the environment, with dev defaults:
 `DATABASE_URL` (`sqlite://data/app.db` — the `data/` directory must exist;
 migrations run automatically at startup) and `BIND_ADDR` (`127.0.0.1:8080`).
+The Vite `/api` proxy target is overridable via `API_PROXY_TARGET` (native
+default `http://127.0.0.1:8080`; Compose sets `http://backend:8080`).
+
+Docker dev (`docker-compose.yml` + `*/Dockerfile.dev`) bind-mounts `backend/`
+and `frontend/` into the containers, so cargo-watch and Vite pick up edits
+live; `target/`, the cargo registry, and `node_modules` stay in named volumes
+because Linux build artifacts must not mix with the host's macOS ones. The
+SQLite file is shared between native and dockerised runs.
