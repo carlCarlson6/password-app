@@ -1,0 +1,2 @@
+-- Phase 0 baseline: establishes the migration machinery itself.
+-- Real schema arrives with Phase 1 (identity) and Phase 2 (vaulting/access).

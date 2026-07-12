@@ -1,0 +1,30 @@
+# --- Rust (backend/) ---
+backend/target/
+
+# Local SQLite database (keep the directory via .gitkeep)
+backend/data/*
+!backend/data/.gitkeep
+
+# --- Node / React (frontend/) ---
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Vite build cache
+frontend/.vite/
+frontend/*.tsbuildinfo
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Claude Code local settings ---
+.claude/settings.local.json
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
