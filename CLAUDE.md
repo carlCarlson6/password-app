@@ -16,6 +16,12 @@ change:
 
 Docs describing the system wrongly are worse than no docs. Never leave this for later.
 
+## Task workflow
+
+- When indicated to work on a task, first document in `README.md` the analysis and
+  the changes to be done (what will change and why), **before** implementing. Keep
+  that record accurate as the work progresses — it is part of the deliverable.
+
 ## Worktree workflow
 
 - When an implementation or set of changes is finished in a worktree, **do not merge
