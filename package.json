@@ -1,0 +1,14 @@
+{
+  "name": "password-app",
+  "private": true,
+  "description": "Root-level npm scripts wrapping scripts/dev.sh and scripts/ci.sh",
+  "scripts": {
+    "dev": "./scripts/dev.sh",
+    "dev:detach": "./scripts/dev.sh detach",
+    "dev:logs": "./scripts/dev.sh logs",
+    "dev:down": "./scripts/dev.sh down",
+    "ci": "./scripts/ci.sh",
+    "ci:backend": "./scripts/ci.sh backend",
+    "ci:frontend": "./scripts/ci.sh frontend"
+  }
+}

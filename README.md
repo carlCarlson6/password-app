@@ -233,6 +233,10 @@ learns the organization structure either.
 # full local CI — fmt/clippy/build/tests (backend) + typecheck/tests/build (frontend)
 ./scripts/ci.sh                           # or: ./scripts/ci.sh backend|frontend
 
+# npm equivalents (root package.json wraps the scripts above)
+npm run dev                               # dev:detach | dev:logs | dev:down
+npm run ci                                # ci:backend | ci:frontend
+
 # backend (from backend/)
 cargo test                                # tests live in each crate's tests/, mirroring src/
 cargo clippy --workspace -- -D warnings

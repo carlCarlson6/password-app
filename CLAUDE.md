@@ -65,6 +65,9 @@ Docs describing the system wrongly are worse than no docs. Never leave this for 
   SQLite is a bind-mounted file (`backend/data/app.db`), not a compose service.
 - Local CI (from repo root): `./scripts/ci.sh` runs the full pipeline below;
   `./scripts/ci.sh backend|frontend` runs one side only.
+- npm equivalents (root `package.json`, from repo root): `npm run dev`
+  (`dev:detach|dev:logs|dev:down`) and `npm run ci` (`ci:backend|ci:frontend`)
+  wrap the two scripts above.
 - Backend (from `backend/`): `cargo test`, `cargo clippy --workspace -- -D warnings`,
   `cargo fmt --all`, `cargo run -p api`
 - Frontend (from `frontend/`): `npm run dev`, `npm run typecheck`, `npm test -- --run`,
