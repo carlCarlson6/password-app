@@ -32,6 +32,9 @@ Docs describing the system wrongly are worse than no docs. Never leave this for 
 
 ## Testing style
 
+- Every new feature MUST ship with tests that verify its behavior, in the same
+  change — new use cases, domain logic, and endpoints are not done until tests
+  prove the implementation is correct. This applies to both backend and frontend.
 - Backend tests never live inline in source files (`#[cfg(test)] mod tests` is
   banned). Each crate keeps all its tests in its `tests/` directory, mirroring
   the `src/` folder structure: the test for `src/identity/email_address.rs` is
