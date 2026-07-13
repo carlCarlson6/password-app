@@ -3,9 +3,10 @@
 A zero-knowledge, multi-user password manager. Rust backend, React frontend,
 clean DDD + hexagonal architecture on both sides.
 
-**Status:** Phase 0 complete — the walking skeleton runs end to end
-(UI → Axum → use case → SQLite), the full stack runs under Docker Compose
-(`./scripts/dev.sh`), and `./scripts/ci.sh` runs the CI checks locally.
+**Status:** Phase 1 in progress — the client crypto core (`CryptoService`:
+Argon2id via WASM, HKDF, AES-256-GCM, RSA-OAEP keypair) is implemented with
+pinned test vectors. Phase 0 (walking skeleton, Docker Compose dev stack,
+local CI via `./scripts/ci.sh`) is complete.
 
 ---
 
@@ -22,6 +23,7 @@ clean DDD + hexagonal architecture on both sides.
 | Backend framework | Axum | Tokio-native, tower middleware, type-safe extractors. |
 | Frontend | React + TypeScript + Vite | TanStack Query for server state, Zustand for client state, Tailwind for styling. (Defaults — cheap to swap.) |
 | V1 features | Vault CRUD, auth, crypto core, **password generator**, **folders/tags/search** | TOTP storage, import/export, recovery keys, sharing → v2 roadmap. |
+| Argon2id in the browser | `hash-wasm` | Small audited WASM build, works in browsers and Node (so vitest exercises the real thing). Hidden behind the `CryptoService` port — swappable without touching use cases. |
 
 ---
 
@@ -187,7 +189,7 @@ learns the organization structure either.
   `{"status":"ok","database":"up"}` from a live SQLite pool.
 
 ### Phase 1 — Crypto core & identity
-- [ ] Frontend `CryptoService`: Argon2id (WASM), HKDF, AES-256-GCM, RSA keypair gen; test vectors pinned
+- [x] Frontend `CryptoService`: Argon2id (WASM), HKDF, AES-256-GCM, RSA keypair gen; test vectors pinned
 - [ ] Register: derive keys client-side, ship wrapped keys + login hash
 - [ ] Login/prelogin/refresh; Argon2 re-hash server-side; rate limiting
 - [ ] Unlock flow: keys held in memory only; auto-lock on idle/tab close
