@@ -16,6 +16,12 @@ change:
 
 Docs describing the system wrongly are worse than no docs. Never leave this for later.
 
+## Worktree workflow
+
+- When an implementation or set of changes is finished in a worktree, **do not merge
+  it into `main` on your own**. Stop, summarize what changed, and wait for the
+  project owner's explicit approval before merging.
+
 ## Architecture rules
 
 - Dependency rule: `api → application → domain`; `infrastructure` implements
