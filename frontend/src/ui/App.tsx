@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
 
 import type { CheckServerHealth } from "../application/checkServerHealth";
+import type { Login } from "../application/login";
+import type { RegisterUser } from "../application/registerUser";
 import { type ServerHealth, isHealthy } from "../domain/health";
+import { LoginForm } from "./LoginForm";
+import { SignupForm } from "./SignupForm";
 
 interface AppProps {
-  // The use case arrives as a prop from the composition root (main.tsx):
+  // Use cases arrive as props from the composition root (main.tsx):
   // the UI layer never builds gateways or touches fetch itself.
   checkServerHealth: CheckServerHealth;
+  registerUser: RegisterUser;
+  login: Login;
 }
 
-export function App({ checkServerHealth }: AppProps) {
+type View = "login" | "signup" | "unlocked";
+
+export function App({ checkServerHealth, registerUser, login }: AppProps) {
   const [health, setHealth] = useState<ServerHealth | null>(null);
+  const [view, setView] = useState<View>("login");
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,14 +35,63 @@ export function App({ checkServerHealth }: AppProps) {
   return (
     <main>
       <h1>Password App</h1>
-      <p>Walking skeleton: UI → Axum → use case → SQLite and back.</p>
-      {health === null ? (
-        <p>Checking server…</p>
-      ) : (
-        <p role="status">
-          Server is {isHealthy(health) ? "healthy" : "degraded"} — database{" "}
-          {health.database}.
-        </p>
+
+      {view !== "unlocked" && (
+        <nav>
+          <button
+            type="button"
+            onClick={() => {
+              setView("login");
+              setNotice(null);
+            }}
+            disabled={view === "login"}
+          >
+            Log in
+          </button>{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setView("signup");
+              setNotice(null);
+            }}
+            disabled={view === "signup"}
+          >
+            Sign up
+          </button>
+        </nav>
+      )}
+
+      {notice && <p role="status">{notice}</p>}
+
+      {view === "login" && (
+        <LoginForm
+          login={login}
+          onLoggedIn={() => {
+            setNotice(null);
+            setView("unlocked");
+          }}
+        />
+      )}
+      {view === "signup" && (
+        <SignupForm
+          registerUser={registerUser}
+          onRegistered={() => {
+            setNotice("Account created. Log in with your master password.");
+            setView("login");
+          }}
+        />
+      )}
+      {view === "unlocked" && (
+        <p role="status">Vault unlocked. Your keys are held in memory only.</p>
+      )}
+
+      {health !== null && (
+        <footer>
+          <small>
+            Server is {isHealthy(health) ? "healthy" : "degraded"} — database{" "}
+            {health.database}.
+          </small>
+        </footer>
       )}
     </main>
   );

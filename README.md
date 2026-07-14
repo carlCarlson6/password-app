@@ -193,8 +193,60 @@ learns the organization structure either.
 - [ ] Register: derive keys client-side, ship wrapped keys + login hash
 - [ ] Login/prelogin/refresh; Argon2 re-hash server-side; rate limiting
 - [ ] Unlock flow: keys held in memory only; auto-lock on idle/tab close
-- [ ] Signup UX warns explicitly: no recovery in v1
+- [x] Signup UX warns explicitly: no recovery in v1
 - **Done when:** a registered user can log in from a fresh browser and unwrap their keys; server DB provably contains no plaintext.
+
+#### Phase 1 task analysis — frontend register/login
+
+Goal: the client half of "Register" and "Login/prelogin" — derive and wrap all
+key material in the browser and speak the auth wire contract. The backend half
+and the lock/unlock flow (real in-memory key store, auto-lock) are parallel
+tasks on other branches.
+
+Wire contract (backend is built against exactly this; JSON camelCase):
+
+- `POST /api/auth/prelogin` `{email}` → `200 {kdf: {algorithm, memoryKiB, iterations, parallelism}}`
+- `POST /api/auth/register` `{email, masterPasswordHash, kdf, wrappedUserSymmetricKey, publicKey, wrappedPrivateKey}` → `201` (binary fields base64)
+- `POST /api/auth/login` `{email, masterPasswordHash}` → `200 {accessToken, wrappedUserSymmetricKey, publicKey, wrappedPrivateKey}` + httpOnly refresh cookie
+- `POST /api/auth/refresh` → `200 {accessToken}`
+
+Changes:
+
+- `src/application/ports.ts` becomes `src/application/ports/` (barrel
+  `index.ts`, so existing `…/application/ports` imports keep working):
+  `cryptoService.ts` and `healthGateway.ts` move as-is; new `authApi.ts`
+  (driven port for the four auth endpoints) and `keyStore.ts` (`KeyStore`:
+  `set/get/clear` of the unlocked `UnlockedKeys` — the seam the parallel
+  lock/unlock task implements for real).
+- `src/domain/crypto.ts`: `encodeBlobBase64`/`decodeBlobBase64` — the wire
+  contract wants plain base64 for wrapped keys, so the canonical versioned
+  blob string (`v1.<iv>.<ct>`) is base64-wrapped whole (stays versioned,
+  stays opaque to the server).
+- `src/application/registerUser.ts`: Master Key (Argon2id, salt=email) →
+  Master Password Hash + HKDF-stretched key → generate + wrap the User
+  Symmetric Key (AES-256-GCM under the stretched key) → generate RSA-OAEP-2048
+  pair, wrap the private key under the USK → POST register. KDF params are
+  injectable (defaults pinned in `domain/crypto.ts`) so tests run cheap costs.
+- `src/application/login.ts`: prelogin → derive MK/MPH → POST login → unwrap
+  USK and private key locally → hand `UnlockedKeys` to the `KeyStore` port.
+- `src/infrastructure/http/authApi.ts`: fetch adapter, `credentials:
+  "include"` (refresh token is an httpOnly cookie); it keeps the access token
+  in closure memory only and exposes `getAccessToken()` for future API clients.
+- `src/ui/`: `SignupForm` (loud, explicit "no recovery in v1" warning +
+  required acknowledgement checkbox — submission is blocked without it) and
+  `LoginForm`; `App` switches views with local state (no router dependency
+  yet). Forms only call the injected use cases; `main.tsx` wires adapters and
+  a placeholder in-memory `KeyStore` (real adapter arrives with the
+  lock/unlock task).
+- Tests mirror `src/` under `tests/` (vitest; real `CryptoService`, faked
+  `AuthApi` port): register payload round-trips (everything wrapped can be
+  unwrapped), login unwraps keys from a faked response into the key store,
+  the signup form blocks submission without the acknowledgement. UI tests run
+  under jsdom + Testing Library (new dev dependencies).
+
+Status: frontend side of "Register" and "Login/prelogin" is done on this
+branch (the shared checkboxes above stay unticked until the backend half
+lands); the signup no-recovery warning is delivered.
 
 ### Phase 2 — Vaults & items
 - [ ] `Vault`, `VaultItem`, `VaultGrant` aggregates + SQLite repositories

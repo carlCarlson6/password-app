@@ -76,6 +76,23 @@ export function parseBlob(serialized: string): EncryptedBlob {
   return { iv: decodeBase64(parts[1]), ciphertext: decodeBase64(parts[2]) };
 }
 
+/**
+ * API transport for wrapped keys: the auth wire contract wants plain base64,
+ * so the canonical versioned blob string (`v1.<iv>.<ct>`) is base64-wrapped
+ * whole. The blob stays versioned and stays opaque to the server.
+ */
+export function encodeBlobBase64(blob: EncryptedBlob): string {
+  // serializeBlob output is pure ASCII, so btoa is safe here.
+  return btoa(serializeBlob(blob));
+}
+
+export function decodeBlobBase64(text: string): EncryptedBlob {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(text)) {
+    throw new Error("malformed base64");
+  }
+  return parseBlob(atob(text));
+}
+
 // btoa/atob work on "binary strings"; these helpers hide that quirk.
 // (Available in browsers and Node ≥ 16 — no Buffer, so the domain stays pure.)
 export function encodeBase64(bytes: Uint8Array): string {
