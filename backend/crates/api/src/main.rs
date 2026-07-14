@@ -1,10 +1,16 @@
 //! Composition root: load config, build adapters, wire use cases, serve.
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 
-use application::use_cases::CheckHealth;
+use application::use_cases::{CheckHealth, Login, Prelogin, RefreshSession, RegisterUser};
 use infrastructure::config::AppConfig;
-use infrastructure::persistence::{SqliteDatabaseProbe, connect, run_migrations};
+use infrastructure::persistence::{
+    SqliteDatabaseProbe, SqliteSessionRepository, SqliteUserRepository, connect, run_migrations,
+};
+use infrastructure::security::{
+    Argon2PasswordHasher, JwtTokenIssuer, Sha256RefreshTokenVendor, SystemClock, UuidGenerator,
+};
 
 use api::{AppState, build_router};
 
@@ -24,17 +30,59 @@ async fn main() -> anyhow::Result<()> {
     let pool = connect(&config.database_url).await?;
     run_migrations(&pool).await?;
 
-    // Hexagonal wiring, innermost out: adapter → use case → HTTP state.
-    let check_health = CheckHealth::new(Arc::new(SqliteDatabaseProbe::new(pool)));
+    // Hexagonal wiring, innermost out: adapters → use cases → HTTP state.
+    // Rust note: one `Arc` per adapter, `.clone()`d into each use case that
+    // needs it — clones are pointer copies, the adapter exists once.
+    let users = Arc::new(SqliteUserRepository::new(pool.clone()));
+    let sessions = Arc::new(SqliteSessionRepository::new(pool.clone()));
+    let hasher = Arc::new(Argon2PasswordHasher::new()?); // one Argon2 at boot (dummy hash)
+    let tokens = Arc::new(JwtTokenIssuer::new(
+        config.jwt_secret.as_bytes(),
+        config.access_token_ttl_seconds,
+    ));
+    let vendor = Arc::new(Sha256RefreshTokenVendor);
+    let ids = Arc::new(UuidGenerator);
+    let clock = Arc::new(SystemClock);
+
     let state = AppState {
-        check_health: Arc::new(check_health),
+        check_health: Arc::new(CheckHealth::new(Arc::new(SqliteDatabaseProbe::new(pool)))),
+        register_user: Arc::new(RegisterUser::new(
+            users.clone(),
+            hasher.clone(),
+            ids.clone(),
+        )),
+        prelogin: Arc::new(Prelogin::new(users.clone())),
+        login: Arc::new(Login::new(
+            users,
+            sessions.clone(),
+            hasher,
+            tokens.clone(),
+            vendor.clone(),
+            ids.clone(),
+            clock.clone(),
+            config.refresh_token_ttl_seconds,
+        )),
+        refresh_session: Arc::new(RefreshSession::new(
+            sessions,
+            tokens,
+            vendor,
+            ids,
+            clock,
+            config.refresh_token_ttl_seconds,
+        )),
+        cookie_secure: config.cookie_secure,
     };
 
     let listener = tokio::net::TcpListener::bind(&config.bind_addr).await?;
     tracing::info!(addr = %config.bind_addr, "api listening");
-    axum::serve(listener, build_router(state))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    // `with_connect_info` exposes each client's SocketAddr to the rate
+    // limiter, which keys its buckets by IP.
+    axum::serve(
+        listener,
+        build_router(state).into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     Ok(())
 }

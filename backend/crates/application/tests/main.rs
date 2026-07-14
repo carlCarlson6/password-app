@@ -8,4 +8,5 @@
 // are ignored unless a `mod` declaration reaches them from here — that's what
 // lets us mirror the `src/` folder structure inside one test binary.
 
+mod support;
 mod use_cases;
