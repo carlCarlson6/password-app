@@ -8,8 +8,9 @@
 // library so the `tests/` harness can build a router without spawning a server.
 
 pub mod handlers;
+pub mod middleware;
 pub mod routes;
 pub mod state;
 
-pub use routes::build_router;
+pub use routes::{build_router, build_router_with};
 pub use state::AppState;

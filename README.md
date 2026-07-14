@@ -5,8 +5,11 @@ clean DDD + hexagonal architecture on both sides.
 
 **Status:** Phase 1 in progress — the client crypto core (`CryptoService`:
 Argon2id via WASM, HKDF, AES-256-GCM, RSA-OAEP keypair) is implemented with
-pinned test vectors. Phase 0 (walking skeleton, Docker Compose dev stack,
-local CI via `./scripts/ci.sh`) is complete.
+pinned test vectors, and the backend Identity context (register / prelogin /
+login / refresh with Argon2id re-hash, rotating refresh sessions, and auth
+rate limiting) is complete — see "Phase 1 task analysis — backend identity".
+Phase 0 (walking skeleton, Docker Compose dev stack, local CI via
+`./scripts/ci.sh`) is complete.
 
 ---
 
@@ -191,10 +194,91 @@ learns the organization structure either.
 ### Phase 1 — Crypto core & identity
 - [x] Frontend `CryptoService`: Argon2id (WASM), HKDF, AES-256-GCM, RSA keypair gen; test vectors pinned
 - [ ] Register: derive keys client-side, ship wrapped keys + login hash
-- [ ] Login/prelogin/refresh; Argon2 re-hash server-side; rate limiting
+      (backend endpoint done — see task analysis below; client half pending)
+- [x] Login/prelogin/refresh; Argon2 re-hash server-side; rate limiting
 - [ ] Unlock flow: keys held in memory only; auto-lock on idle/tab close
 - [ ] Signup UX warns explicitly: no recovery in v1
 - **Done when:** a registered user can log in from a fresh browser and unwrap their keys; server DB provably contains no plaintext.
+
+### Phase 1 task analysis — backend identity
+
+Server-side half of Phase 1: the Identity bounded context end to end
+(domain → application → infrastructure → api), built against the wire
+contract below, which the frontend is implementing in parallel.
+
+**What changes and why:**
+
+- `domain/src/identity/` — `UserAccount` aggregate plus value objects:
+  `UserId`, `KdfParams` (validated Argon2id parameters with the deterministic
+  default m=65536 KiB, t=3, p=4), `MasterPasswordHash` (the client-supplied
+  login credential, opaque bytes), `KeyBlob` (wrapped-key material, opaque
+  bytes), `CredentialHash` (the server-side Argon2id re-hash, a PHC string),
+  and a `Session` entity for rotating refresh tokens with pure
+  reuse/expiry assessment logic. All pure Rust — no async, no I/O.
+- `application/` — use cases `RegisterUser`, `Prelogin`, `Login`,
+  `RefreshSession`; driven ports `UserRepository`, `SessionRepository`,
+  `PasswordHasher` (Argon2id re-hash + timing-equalized verify),
+  `TokenIssuer` (JWT access tokens), `Clock`, `IdGenerator`,
+  `RefreshTokenVendor` (mints random refresh tokens + hashes them for
+  at-rest storage).
+- `infrastructure/` — SQLite migration for `users` + `refresh_sessions`;
+  `SqliteUserRepository` (one repo for the `UserAccount` aggregate),
+  `SqliteSessionRepository`; `Argon2PasswordHasher` (spawn_blocking, dummy
+  verify for unknown emails), `JwtTokenIssuer` (HS256),
+  `Sha256RefreshTokenVendor`, `UuidGenerator`, `SystemClock`. Config gains
+  `JWT_SECRET`, `COOKIE_SECURE`, token TTLs.
+- `api/` — thin handlers + DTOs for the four auth endpoints; refresh token
+  in an httpOnly cookie (`Path=/api/auth`, `SameSite=Strict`, `Secure`
+  behind config for local dev); hand-rolled tower/axum per-IP rate-limit
+  middleware with exponential backoff on the `/api/auth/*` group. Request
+  bodies on auth routes are never logged.
+
+**Security decisions made here (owner review welcome):**
+
+- *Duplicate registration is indistinguishable from success*: register
+  returns `201 {}` whether or not the email already existed (the insert is
+  skipped on conflict; the Argon2 re-hash runs either way so timing is
+  comparable). Rationale: anti-enumeration; the legitimate owner already
+  has an account, the attacker learns nothing.
+- *Prelogin never 404s*: unknown (or even malformed) emails get the same
+  deterministic default KDF params with the same response shape.
+- *Login failure is one error*: wrong email and wrong password both return
+  the same 401; when the email is unknown a dummy Argon2 verify runs so the
+  timing matches the known-email path.
+- *Refresh rotation with family invalidation*: each refresh token is
+  single-use; presenting a rotated-out token revokes the whole session
+  family. Tokens are stored only as SHA-256 hashes.
+- Server-side re-hash uses the `argon2` crate defaults (Argon2id v19,
+  m=19456 KiB, t=2, p=1) — an at-rest hardening layer on top of the
+  client's already-slow hash, sized for server throughput.
+- Access JWT: HS256, 15 min TTL. Refresh cookie: 14 days.
+- Rate limiting: per-IP sliding window on `/api/auth/*` (20 req/min);
+  exceeding it blocks with exponential backoff (1s doubling per violation,
+  capped at 15 min), surfaced via `429` + `Retry-After`.
+
+**Wire contract (frozen; JSON camelCase):**
+
+- `POST /api/auth/prelogin` `{"email"}` → `200 {"kdf": {"algorithm":
+  "argon2id", "memoryKiB", "iterations", "parallelism"}}` — defaults for
+  unknown emails.
+- `POST /api/auth/register` `{"email", "masterPasswordHash" (b64), "kdf",
+  "wrappedUserSymmetricKey" (b64), "publicKey" (b64), "wrappedPrivateKey"
+  (b64)}` → `201 {}` (also on duplicate email).
+- `POST /api/auth/login` `{"email", "masterPasswordHash" (b64)}` →
+  `200 {"accessToken", "wrappedUserSymmetricKey", "publicKey",
+  "wrappedPrivateKey"}` + httpOnly refresh cookie.
+- `POST /api/auth/refresh` (cookie) → `200 {"accessToken"}` + rotated
+  cookie; reuse of a rotated-out token kills the session family → `401`.
+
+All base64 is standard-alphabet with padding (matches the client's
+`btoa`-based encoder). The server stores the wrapped-key blobs as opaque
+bytes and the login credential only as its Argon2id re-hash.
+
+**Status:** delivered — all four endpoints implemented and tested
+(domain/application/infrastructure/api test suites, `./scripts/ci.sh
+backend` green). The "Register" checkbox above stays unticked because its
+client half (deriving keys in the browser) is a parallel frontend task;
+the backend side of register is complete.
 
 ### Phase 2 — Vaults & items
 - [ ] `Vault`, `VaultItem`, `VaultGrant` aggregates + SQLite repositories

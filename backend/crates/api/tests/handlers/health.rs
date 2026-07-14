@@ -3,25 +3,22 @@
 //! The "up" test is the Phase 0 walking skeleton: a real request through the
 //! router → use case → SQLite adapter and back, no HTTP socket needed.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
-use api::{AppState, build_router};
+use api::build_router;
 use application::ports::{DatabaseProbe, ProbeError};
-use application::use_cases::CheckHealth;
 use infrastructure::persistence::{SqliteDatabaseProbe, connect, run_migrations};
+
+use crate::support::state_with_probe;
 
 // Rust note: `impl Trait` in argument position — accepts any concrete probe
 // type; the function body decides nothing about which adapter it gets.
 fn app_with(probe: impl DatabaseProbe + 'static) -> axum::Router {
-    build_router(AppState {
-        check_health: Arc::new(CheckHealth::new(Arc::new(probe))),
-    })
+    build_router(state_with_probe(probe))
 }
 
 async fn get_health(app: axum::Router) -> (StatusCode, serde_json::Value) {

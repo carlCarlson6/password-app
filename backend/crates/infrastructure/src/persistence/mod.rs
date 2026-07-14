@@ -1,11 +1,14 @@
-//! Persistence adapters: SQLx + SQLite. Repositories (one per aggregate)
-//! arrive in Phases 1–2; for the walking skeleton this wires a connection
-//! pool, migrations, and the [`DatabaseProbe`] adapter.
+//! Persistence adapters: SQLx + SQLite — the connection pool, embedded
+//! migrations, and one repository per aggregate.
 //!
 //! [`DatabaseProbe`]: application::ports::DatabaseProbe
 
 mod pool;
 mod sqlite_probe;
+mod sqlite_session_repository;
+mod sqlite_user_repository;
 
 pub use pool::{connect, run_migrations};
 pub use sqlite_probe::SqliteDatabaseProbe;
+pub use sqlite_session_repository::SqliteSessionRepository;
+pub use sqlite_user_repository::SqliteUserRepository;
