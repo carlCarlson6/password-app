@@ -11,6 +11,7 @@ describe("lockVault", () => {
     const keyStore = makeInMemoryKeyStore();
     keyStore.set({
       userSymmetricKey: new Uint8Array(32).fill(1) as SymmetricKey,
+      publicKeySpki: new Uint8Array(16).fill(3),
       privateKeyPkcs8: new Uint8Array(64).fill(2),
     });
 

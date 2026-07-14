@@ -12,6 +12,9 @@ export interface UnlockContext {
   readonly kdfParams: KdfParams;
   /** User Symmetric Key, AES-256-GCM-wrapped under the Stretched Master Key. */
   readonly wrappedUserSymmetricKey: EncryptedBlob;
+  /** RSA public key (SPKI bytes) — public material, retained so a re-unlock
+   *  restores exactly the `UnlockedKeys` that login produced. */
+  readonly publicKeySpki: Uint8Array;
   /** RSA private key (PKCS#8), AES-256-GCM-wrapped under the User Symmetric Key. */
   readonly wrappedPrivateKey: EncryptedBlob;
 }
@@ -43,7 +46,11 @@ export function makeUnlockVault(cryptoService: CryptoService, keyStore: KeyStore
         userSymmetricKey,
         context.wrappedPrivateKey,
       );
-      keyStore.set({ userSymmetricKey, privateKeyPkcs8 });
+      keyStore.set({
+        userSymmetricKey,
+        publicKeySpki: context.publicKeySpki,
+        privateKeyPkcs8,
+      });
       return true;
     } catch {
       // Wrong master password: GCM's auth tag check rejects the unwrap.

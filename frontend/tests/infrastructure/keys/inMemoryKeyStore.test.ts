@@ -9,6 +9,7 @@ import { makeInMemoryKeyStore } from "../../../src/infrastructure/keys/inMemoryK
 function someKeys(): UnlockedKeys {
   return {
     userSymmetricKey: new Uint8Array(32).fill(7) as SymmetricKey,
+    publicKeySpki: new Uint8Array(16).fill(4),
     privateKeyPkcs8: new Uint8Array(64).fill(9),
   };
 }

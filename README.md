@@ -3,13 +3,15 @@
 A zero-knowledge, multi-user password manager. Rust backend, React frontend,
 clean DDD + hexagonal architecture on both sides.
 
-**Status:** Phase 1 in progress — the client crypto core (`CryptoService`:
-Argon2id via WASM, HKDF, AES-256-GCM, RSA-OAEP keypair) is implemented with
-pinned test vectors, and the backend Identity context (register / prelogin /
-login / refresh with Argon2id re-hash, rotating refresh sessions, and auth
-rate limiting) is complete — see "Phase 1 task analysis — backend identity".
-Phase 0 (walking skeleton, Docker Compose dev stack, local CI via
-`./scripts/ci.sh`) is complete.
+**Status:** Phase 1 nearly complete — client crypto core (`CryptoService`),
+backend Identity context (register / prelogin / login / refresh, Argon2id
+re-hash, rotating refresh sessions, rate limiting), frontend register/login
+flows (client-side key derivation + signup no-recovery warning), and the
+unlock/auto-lock flow are all implemented and merged (see the "Phase 1 task
+analysis" sections). Remaining: wire `LockScreen`/auto-lock into the app
+shell and verify the end-to-end "fresh browser" criterion. Phase 0 (walking
+skeleton, Docker Compose dev stack, local CI via `./scripts/ci.sh`) is
+complete.
 
 ---
 
@@ -193,11 +195,10 @@ learns the organization structure either.
 
 ### Phase 1 — Crypto core & identity
 - [x] Frontend `CryptoService`: Argon2id (WASM), HKDF, AES-256-GCM, RSA keypair gen; test vectors pinned
-- [ ] Register: derive keys client-side, ship wrapped keys + login hash
-      (backend endpoint done — see task analysis below; client half pending)
+- [x] Register: derive keys client-side, ship wrapped keys + login hash
 - [x] Login/prelogin/refresh; Argon2 re-hash server-side; rate limiting
 - [x] Unlock flow: keys held in memory only; auto-lock on idle/tab close
-- [ ] Signup UX warns explicitly: no recovery in v1
+- [x] Signup UX warns explicitly: no recovery in v1
 - **Done when:** a registered user can log in from a fresh browser and unwrap their keys; server DB provably contains no plaintext.
 
 #### Phase 1 task analysis — unlock & auto-lock (frontend)
@@ -238,6 +239,7 @@ What changes and why (all under `frontend/`, no backend changes):
 Composition-root wiring (holding the `UnlockContext` after login and rendering
 `LockScreen` when locked) lands with the register/login flow, which is what
 produces a session to lock in the first place.
+
 #### Phase 1 task analysis — backend identity
 
 Server-side half of Phase 1: the Identity bounded context end to end
@@ -314,9 +316,65 @@ bytes and the login credential only as its Argon2id re-hash.
 
 **Status:** delivered — all four endpoints implemented and tested
 (domain/application/infrastructure/api test suites, `./scripts/ci.sh
-backend` green). The "Register" checkbox above stays unticked because its
-client half (deriving keys in the browser) is a parallel frontend task;
-the backend side of register is complete.
+backend` green). The client half of register/login is the frontend task
+below; both are merged, so the "Register" checkbox above is ticked.
+
+#### Phase 1 task analysis — frontend register/login
+
+Goal: the client half of "Register" and "Login/prelogin" — derive and wrap all
+key material in the browser and speak the auth wire contract. The backend half
+and the lock/unlock flow (real in-memory key store, auto-lock) are parallel
+tasks on other branches.
+
+Wire contract (backend is built against exactly this; JSON camelCase):
+
+- `POST /api/auth/prelogin` `{email}` → `200 {kdf: {algorithm, memoryKiB, iterations, parallelism}}`
+- `POST /api/auth/register` `{email, masterPasswordHash, kdf, wrappedUserSymmetricKey, publicKey, wrappedPrivateKey}` → `201` (binary fields base64)
+- `POST /api/auth/login` `{email, masterPasswordHash}` → `200 {accessToken, wrappedUserSymmetricKey, publicKey, wrappedPrivateKey}` + httpOnly refresh cookie
+- `POST /api/auth/refresh` → `200 {accessToken}`
+
+Changes:
+
+- `src/application/ports.ts` becomes `src/application/ports/` (barrel
+  `index.ts`, so existing `…/application/ports` imports keep working):
+  `cryptoService.ts` and `healthGateway.ts` move as-is; new `authApi.ts`
+  (driven port for the four auth endpoints) and `keyStore.ts` (`KeyStore`:
+  `set/get/clear` of the unlocked `UnlockedKeys` — the seam the parallel
+  lock/unlock task implements for real).
+- `src/domain/crypto.ts`: `encodeBlobBase64`/`decodeBlobBase64` — the wire
+  contract wants plain base64 for wrapped keys, so the canonical versioned
+  blob string (`v1.<iv>.<ct>`) is base64-wrapped whole (stays versioned,
+  stays opaque to the server).
+- `src/application/registerUser.ts`: Master Key (Argon2id, salt=email) →
+  Master Password Hash + HKDF-stretched key → generate + wrap the User
+  Symmetric Key (AES-256-GCM under the stretched key) → generate RSA-OAEP-2048
+  pair, wrap the private key under the USK → POST register. KDF params are
+  injectable (defaults pinned in `domain/crypto.ts`) so tests run cheap costs.
+- `src/application/login.ts`: prelogin → derive MK/MPH → POST login → unwrap
+  USK and private key locally → hand `UnlockedKeys` to the `KeyStore` port.
+- `src/infrastructure/http/authApi.ts`: fetch adapter, `credentials:
+  "include"` (refresh token is an httpOnly cookie); it keeps the access token
+  in closure memory only and exposes `getAccessToken()` for future API clients.
+- `src/ui/`: `SignupForm` (loud, explicit "no recovery in v1" warning +
+  required acknowledgement checkbox — submission is blocked without it) and
+  `LoginForm`; `App` switches views with local state (no router dependency
+  yet). Forms only call the injected use cases; `main.tsx` wires adapters and
+  a placeholder in-memory `KeyStore` (real adapter arrives with the
+  lock/unlock task).
+- Tests mirror `src/` under `tests/` (vitest; real `CryptoService`, faked
+  `AuthApi` port): register payload round-trips (everything wrapped can be
+  unwrapped), login unwraps keys from a faked response into the key store,
+  the signup form blocks submission without the acknowledgement. UI tests run
+  under jsdom + Testing Library (new dev dependencies).
+
+Status: delivered and merged together with the backend half — "Register",
+"Login/prelogin/refresh" and the signup no-recovery warning are all ticked
+above. Note (merge reconciliation): `main.tsx` now wires the real
+`makeInMemoryKeyStore` from the unlock/auto-lock task instead of the
+placeholder, and `UnlockedKeys`/`UnlockContext` carry the public key
+(`publicKeySpki`) so a re-unlock restores exactly what login produced.
+Remaining Phase 1 wiring: render `LockScreen` + `useAutoLock` around the
+unlocked view, then verify the end-to-end "fresh browser" criterion.
 
 ### Phase 2 — Vaults & items
 - [ ] `Vault`, `VaultItem`, `VaultGrant` aggregates + SQLite repositories

@@ -38,6 +38,7 @@ beforeAll(async () => {
     email: EMAIL,
     kdfParams: TEST_KDF_PARAMS,
     wrappedUserSymmetricKey: await cryptoService.encrypt(stretchedKey, userSymmetricKey),
+    publicKeySpki: keyPair.publicKeySpki,
     wrappedPrivateKey: await cryptoService.encrypt(
       userSymmetricKey,
       keyPair.privateKeyPkcs8,
