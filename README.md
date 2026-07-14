@@ -192,9 +192,48 @@ learns the organization structure either.
 - [x] Frontend `CryptoService`: Argon2id (WASM), HKDF, AES-256-GCM, RSA keypair gen; test vectors pinned
 - [ ] Register: derive keys client-side, ship wrapped keys + login hash
 - [ ] Login/prelogin/refresh; Argon2 re-hash server-side; rate limiting
-- [ ] Unlock flow: keys held in memory only; auto-lock on idle/tab close
+- [x] Unlock flow: keys held in memory only; auto-lock on idle/tab close
 - [ ] Signup UX warns explicitly: no recovery in v1
 - **Done when:** a registered user can log in from a fresh browser and unwrap their keys; server DB provably contains no plaintext.
+
+#### Phase 1 task analysis — unlock & auto-lock (frontend)
+
+What changes and why (all under `frontend/`, no backend changes):
+
+- **`KeyStore` port** (`src/application/ports/keyStore.ts`): the application-layer
+  contract for holding the unwrapped key material (`UnlockedKeys`: the User
+  Symmetric Key plus the decrypted RSA private key — exactly what unwrapping the
+  server's wrapped keys produces) while the vault is unlocked. Minimal shape:
+  `set(keys)` / `get()` / `clear()`. The login flow (separate change) calls
+  `set(...)` after unwrapping at login.
+- **`InMemoryKeyStore` adapter** (`src/infrastructure/keys/inMemoryKeyStore.ts`):
+  keys live in a closure variable only — never localStorage/sessionStorage/
+  IndexedDB, never serialized. `clear()` best-effort zeroizes the key bytes
+  before dropping the reference.
+- **Use cases** (`src/application/`):
+  - `lockVault.ts` — `lock()` clears the key store.
+  - `unlockVault.ts` — `unlock(context, masterPassword)` re-derives the Master
+    Key (Argon2id, salt=email) and Stretched Master Key via the `CryptoService`
+    port, unwraps the retained *wrapped* keys (`UnlockContext`: email, KDF
+    params, wrapped USK + wrapped private key — ciphertext, safe to keep in
+    memory for re-unlock), and repopulates the store. A wrong password fails
+    cleanly (AES-GCM auth failure → returns `false`), leaving the store locked.
+  - `autoLock.ts` — pure timer/activity logic (`makeIdleAutoLock`): locks after
+    a configurable idle period (default 5 min); `recordActivity()` resets the
+    countdown. No DOM — vitest drives it with fake timers.
+- **UI** (`src/ui/`): `LockScreen.tsx` (master-password prompt calling the
+  injected unlock use case — never WebCrypto/fetch directly) and
+  `hooks/useAutoLock.ts`, the thin DOM adapter wiring user-activity events to
+  `recordActivity()` and `pagehide`/`beforeunload` to an immediate lock
+  (in-memory keys vanish on close anyway; clearing is defense in depth).
+- **Tests** (`tests/`, mirroring `src/`): key store set/get/clear + zeroization;
+  unlock round-trip against the real `CryptoService` (correct password
+  repopulates the store, wrong password fails and the store stays empty); idle
+  auto-lock fires after the timeout and activity resets it (fake timers).
+
+Composition-root wiring (holding the `UnlockContext` after login and rendering
+`LockScreen` when locked) lands with the register/login flow, which is what
+produces a session to lock in the first place.
 
 ### Phase 2 — Vaults & items
 - [ ] `Vault`, `VaultItem`, `VaultGrant` aggregates + SQLite repositories
