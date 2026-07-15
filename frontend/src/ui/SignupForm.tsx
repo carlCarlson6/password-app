@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
 import type { RegisterUser } from "../application/registerUser";
 
@@ -8,15 +8,6 @@ interface SignupFormProps {
   registerUser: RegisterUser;
   onRegistered: (email: string) => void;
 }
-
-const warningStyle: CSSProperties = {
-  border: "3px solid #c0392b",
-  background: "#fdecea",
-  color: "#7b241c",
-  padding: "0.75rem 1rem",
-  margin: "1rem 0",
-  maxWidth: "34rem",
-};
 
 export function SignupForm({ registerUser, onRegistered }: SignupFormProps) {
   const [email, setEmail] = useState("");
@@ -58,12 +49,12 @@ export function SignupForm({ registerUser, onRegistered }: SignupFormProps) {
   }
 
   return (
-    <section>
-      <h2>Create account</h2>
+    <section className="flex flex-col gap-4">
+      <h2 className="term-heading">Create account</h2>
 
-      <div role="alert" style={warningStyle}>
+      <div role="alert" className="term-warning">
         <strong>⚠️ There is NO password recovery.</strong>
-        <p>
+        <p className="mt-2">
           Your master password encrypts everything, and we never see it. If you
           forget it, your vault is <strong>permanently unrecoverable</strong> —
           no reset email, no support ticket, no exceptions. Write it down and
@@ -71,11 +62,12 @@ export function SignupForm({ registerUser, onRegistered }: SignupFormProps) {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} aria-label="sign up">
-        <div>
-          <label>
-            Email{" "}
+      <form onSubmit={handleSubmit} aria-label="sign up" className="flex flex-col gap-4">
+        <div className="term-field">
+          <label className="term-label">
+            Email
             <input
+              className="term-input"
               type="email"
               name="email"
               autoComplete="username"
@@ -85,10 +77,11 @@ export function SignupForm({ registerUser, onRegistered }: SignupFormProps) {
             />
           </label>
         </div>
-        <div>
-          <label>
-            Master password{" "}
+        <div className="term-field">
+          <label className="term-label">
+            Master password
             <input
+              className="term-input"
               type="password"
               name="masterPassword"
               autoComplete="new-password"
@@ -98,10 +91,11 @@ export function SignupForm({ registerUser, onRegistered }: SignupFormProps) {
             />
           </label>
         </div>
-        <div>
-          <label>
-            Confirm master password{" "}
+        <div className="term-field">
+          <label className="term-label">
+            Confirm master password
             <input
+              className="term-input"
               type="password"
               name="masterPasswordConfirmation"
               autoComplete="new-password"
@@ -111,22 +105,27 @@ export function SignupForm({ registerUser, onRegistered }: SignupFormProps) {
             />
           </label>
         </div>
-        <div>
-          <label>
+        <div className="term-field">
+          <label className="flex items-start gap-2 text-sm">
             <input
+              className="term-checkbox mt-0.5"
               type="checkbox"
               name="acknowledgeNoRecovery"
               checked={acknowledged}
               onChange={(e) => setAcknowledged(e.target.checked)}
-            />{" "}
+            />
             I understand that if I forget my master password, my vault is lost
             forever and cannot be recovered by anyone.
           </label>
         </div>
-        <button type="submit" disabled={!canSubmit}>
+        <button type="submit" className="term-btn" disabled={!canSubmit}>
           {submitting ? "Creating account…" : "Create account"}
         </button>
-        {error && <p role="alert">{error}</p>}
+        {error && (
+          <p role="alert" className="term-error">
+            {error}
+          </p>
+        )}
       </form>
     </section>
   );

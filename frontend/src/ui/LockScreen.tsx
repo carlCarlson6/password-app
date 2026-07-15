@@ -34,26 +34,41 @@ export function LockScreen({ unlock }: LockScreenProps) {
   };
 
   return (
-    <main>
-      <h1>Vault locked</h1>
-      <p>Enter your master password to unlock.</p>
-      <form onSubmit={(event) => void handleSubmit(event)}>
-        <label>
-          Master password
-          <input
-            type="password"
-            autoComplete="current-password"
-            autoFocus
-            value={password}
-            disabled={pending}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-        <button type="submit" disabled={pending || password === ""}>
-          {pending ? "Unlocking…" : "Unlock"}
-        </button>
-        {failed && <p role="alert">Wrong master password — try again.</p>}
-      </form>
+    <main className="term-screen">
+      <div className="term-window">
+        <header className="term-titlebar">
+          <h1 className="term-cursor">Vault locked</h1>
+          <span aria-hidden="true">▓▒░</span>
+        </header>
+        <div className="term-body">
+          <p className="text-sm text-crt-dim">Enter your master password to unlock.</p>
+          <form
+            onSubmit={(event) => void handleSubmit(event)}
+            className="flex flex-col gap-4"
+          >
+            <label className="term-label">
+              Master password
+              <input
+                className="term-input"
+                type="password"
+                autoComplete="current-password"
+                autoFocus
+                value={password}
+                disabled={pending}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <button type="submit" className="term-btn" disabled={pending || password === ""}>
+              {pending ? "Unlocking…" : "Unlock"}
+            </button>
+            {failed && (
+              <p role="alert" className="term-error">
+                Wrong master password — try again.
+              </p>
+            )}
+          </form>
+        </div>
+      </div>
     </main>
   );
 }

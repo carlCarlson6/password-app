@@ -376,6 +376,35 @@ placeholder, and `UnlockedKeys`/`UnlockContext` carry the public key
 Remaining Phase 1 wiring: render `LockScreen` + `useAutoLock` around the
 unlocked view, then verify the end-to-end "fresh browser" criterion.
 
+#### Task analysis — UI styling: Tailwind + retro terminal theme
+
+Bring the frontend from unstyled HTML to a coherent look before building more
+screens (Phase 2 vault UI will reuse these styles). All changes under
+`frontend/`, UI layer only — no use case, port, or backend changes.
+
+- **Tailwind CSS v4** via the first-party Vite plugin (`@tailwindcss/vite`):
+  no `tailwind.config.js` / PostCSS setup needed — the theme is defined in CSS
+  with `@theme` tokens. This makes the "Tailwind for styling" default in the
+  decisions table real.
+- **Theme: retro computer terminal** (green-phosphor CRT). Design tokens in
+  `src/ui/index.css`: near-black background, phosphor-green text with amber
+  (warnings/accent) and red (errors), monospace font stack, glow text-shadows,
+  a fixed scanline overlay, and blocky double-line borders reminiscent of DOS
+  text UIs. System monospace fonts only — no external font/CDN requests (keeps
+  the zero-external-dependency posture that Phase 4 CSP hardening will enforce).
+- **Shared component classes** (`@layer components` in the same file):
+  `term-input`, `term-btn`, `term-checkbox`, `term-panel`, `term-alert`, etc.,
+  so the four screens stay consistent and TSX stays readable instead of
+  repeating long utility chains.
+- **Restyled components** (`src/ui/`): `App.tsx` (terminal window chrome with
+  title bar, tab-style login/signup nav, status footer as a status line),
+  `LoginForm.tsx`, `SignupForm.tsx` (the no-recovery warning becomes a
+  high-contrast amber alert block — replaces its inline `CSSProperties`
+  styling), `LockScreen.tsx`. Markup semantics (roles, labels) are unchanged.
+- **Tests**: existing UI tests query by role/accessible name and keep passing
+  unchanged; styling is presentational so no new behavioral tests are added.
+  `npm run typecheck`, `npm test -- --run`, and `npm run build` gate the change.
+
 ### Phase 2 — Vaults & items
 - [ ] `Vault`, `VaultItem`, `VaultGrant` aggregates + SQLite repositories
 - [ ] Vault CRUD with per-vault keys wrapped under the User Symmetric Key

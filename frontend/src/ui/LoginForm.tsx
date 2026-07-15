@@ -31,13 +31,14 @@ export function LoginForm({ login, onLoggedIn }: LoginFormProps) {
   }
 
   return (
-    <section>
-      <h2>Log in</h2>
-      <form onSubmit={handleSubmit} aria-label="log in">
-        <div>
-          <label>
-            Email{" "}
+    <section className="flex flex-col gap-4">
+      <h2 className="term-heading">Log in</h2>
+      <form onSubmit={handleSubmit} aria-label="log in" className="flex flex-col gap-4">
+        <div className="term-field">
+          <label className="term-label">
+            Email
             <input
+              className="term-input"
               type="email"
               name="email"
               autoComplete="username"
@@ -47,10 +48,11 @@ export function LoginForm({ login, onLoggedIn }: LoginFormProps) {
             />
           </label>
         </div>
-        <div>
-          <label>
-            Master password{" "}
+        <div className="term-field">
+          <label className="term-label">
+            Master password
             <input
+              className="term-input"
               type="password"
               name="masterPassword"
               autoComplete="current-password"
@@ -62,11 +64,16 @@ export function LoginForm({ login, onLoggedIn }: LoginFormProps) {
         </div>
         <button
           type="submit"
+          className="term-btn"
           disabled={submitting || email.length === 0 || password.length === 0}
         >
           {submitting ? "Unlocking…" : "Log in"}
         </button>
-        {error && <p role="alert">{error}</p>}
+        {error && (
+          <p role="alert" className="term-error">
+            {error}
+          </p>
+        )}
       </form>
     </section>
   );

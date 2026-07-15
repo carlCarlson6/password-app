@@ -3,6 +3,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+// Global stylesheet (Tailwind + the retro terminal theme). Imported once at
+// the composition root; components only use the class names it defines.
+import "./ui/index.css";
+
 import { makeCheckServerHealth } from "./application/checkServerHealth";
 import { makeLogin } from "./application/login";
 import { makeRegisterUser } from "./application/registerUser";
